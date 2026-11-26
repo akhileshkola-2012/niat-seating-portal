@@ -1,4 +1,9 @@
-
+<script>
+const supabaseClient = window.supabase.createClient(
+  window.NIAT_CONFIG.SUPABASE_URL,
+  window.NIAT_CONFIG.SUPABASE_KEY
+);
+ 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -67,11 +72,6 @@ footer{text-align:center;font-size:11px;color:#98a2b3;margin:20px}
  <footer>NIAT · Examination Seating Portal</footer>
 </main>
 
-<script>
-const supabaseClient = window.supabase.createClient(
-  window.NIAT_CONFIG.SUPABASE_URL,
-  window.NIAT_CONFIG.SUPABASE_KEY
-);
 
 function safe(value){
  return String(value || "—").replace(/[&<>"']/g,c=>({
