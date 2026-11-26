@@ -1,1 +1,167 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NIAT | Exam Seat Finder</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f6fc;color:#18243a}
+header{background:linear-gradient(120deg,#14213d,#284b85);color:white;text-align:center;padding:35px 15px}
+.logo{margin:auto auto 12px;width:48px;height:48px;background:white;color:#2457d6;border-radius:13px;display:grid;place-items:center;font-size:23px;font-weight:900}
+header h1{margin:0;font-size:25px}
+header p{font-size:13px;color:#dce6f8;margin:9px 0 0}
+main{max-width:540px;margin:35px auto;padding:0 16px}
+.card{background:white;border:1px solid #e4e9f2;border-radius:17px;padding:25px;box-shadow:0 8px 25px #14213d0c}
+h2{font-size:20px;margin:0 0 7px}
+.sub{font-size:13px;color:#68758a;line-height:1.5}
+label{display:block;font-size:12px;font-weight:bold;margin:20px 0 8px;color:#475467}
+input,select{width:100%;height:48px;border:1px solid #d1d9e6;border-radius:9px;padding:0 13px;font-size:15px;background:white}
+input:focus,select:focus{outline:2px solid #dce6ff;border-color:#2457d6}
+button{width:100%;height:48px;margin-top:20px;border:0;border-radius:9px;background:#2457d6;color:white;font-size:15px;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+#message{display:none;margin-top:16px;padding:13px;border-radius:9px;font-size:13px;background:#fff1f0;color:#b42318}
+#result{display:none;margin-top:20px;background:#f7f9ff;border:1px solid #dce5fa;border-radius:13px;padding:17px}
+.result-title{display:flex;justify-content:space-between;gap:10px;align-items:center;font-weight:bold;font-size:14px}
+.badge{background:#e8f7ef;color:#087443;padding:6px 9px;border-radius:20px;font-size:10px}
+.details{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px}
+.cell{background:white;border:1px solid #e5e9f2;border-radius:10px;padding:13px;min-width:0}
+.cell small{display:block;color:#748096;font-size:10px;margin-bottom:8px}
+.cell strong{font-size:15px;overflow-wrap:anywhere}
+.hall strong{font-size:25px;color:#087443}
+.seat strong{font-size:25px;color:#2457d6}
+footer{text-align:center;font-size:11px;color:#98a2b3;margin:20px}
+@media(max-width:400px){.card{padding:18px}}
+</style>
+</head>
+<body>
+<header>
+ <div class="logo">N</div>
+ <h1>NIAT Exam Seat Finder</h1>
+ <p>Find your examination hall and seat number</p>
+</header>
+
+<main>
+ <section class="card">
+  <h2>Find Your Seat</h2>
+  <p class="sub">Select your examination and enter your NIAT ID to view your seating details.</p>
+
+  <label for="exam">SELECT EXAM</label>
+  <select id="exam">
+   <option value="Skill Assessments">Skill Assessments</option>
+   <option value="BITS">BITS</option>
+   <option value="GRIT">GRIT</option>
+  </select>
+
+  <label for="niat">NIAT ID</label>
+  <input id="niat" type="text" placeholder="Enter your NIAT ID" autocomplete="off">
+
+  <button id="searchBtn" onclick="findSeat()">Find My Seat</button>
+
+  <div id="message"></div>
+  <div id="result"></div>
+ </section>
+ <footer>NIAT · Examination Seating Portal</footer>
+</main>
+
+<script>
+const supabaseClient = window.supabase.createClient(
+  window.NIAT_CONFIG.SUPABASE_URL,
+  window.NIAT_CONFIG.SUPABASE_KEY
+);
+
+function safe(value){
+ return String(value || "—").replace(/[&<>"']/g,c=>({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+ }[c]));
+}
+
+async function findSeat(){
+ const exam=document.getElementById("exam").value;
+ const niat=document.getElementById("niat").value.trim();
+ const btn=document.getElementById("searchBtn");
+ const msg=document.getElementById("message");
+ const result=document.getElementById("result");
+
+ msg.style.display="none";
+ result.style.display="none";
+
+ if(!niat){
+  msg.textContent="Please enter your NIAT ID.";
+  msg.style.display="block";
+  return;
+ }
+
+ if(niat.length>40){
+  msg.textContent="Please enter a valid NIAT ID.";
+  msg.style.display="block";
+  return;
+ }
+
+ btn.disabled=true;
+ btn.textContent="Searching...";
+
+ try{
+  const {data,error}=await supabaseClient.rpc("find_student_seat",{
+   p_exam_type:exam,
+   p_niat_id:niat
+  });
+
+  if(error) throw error;
+
+  if(!data || data.length===0){
+   msg.textContent="No seating details found. Please check your NIAT ID and selected exam.";
+   msg.style.display="block";
+   return;
+  }
+
+  const s=data[0];
+
+  result.innerHTML=`
+   <div class="result-title">
+    <span>YOUR SEATING DETAILS</span>
+    <span class="badge">RECORD FOUND</span>
+   </div>
+   <div class="details">
+    <div class="cell">
+     <small>STUDENT NAME</small>
+     <strong>${safe(s.student_name)}</strong>
+    </div>
+    <div class="cell">
+     <small>EXAMINATION</small>
+     <strong>${safe(s.exam_name)}</strong>
+    </div>
+    <div class="cell">
+     <small>EXAM TIME</small>
+     <strong>${safe(s.exam_time)}</strong>
+    </div>
+    <div class="cell hall">
+     <small>HALL NUMBER</small>
+     <strong>${safe(s.hall_no)}</strong>
+    </div>
+    <div class="cell seat">
+     <small>SEAT NUMBER</small>
+     <strong>${safe(s.seat_no)}</strong>
+    </div>
+   </div>`;
+
+  result.style.display="block";
+
+ }catch(error){
+  console.error(error);
+  msg.textContent="Unable to retrieve seating details. Please try again or contact the campus team.";
+  msg.style.display="block";
+ }finally{
+  btn.disabled=false;
+  btn.textContent="Find My Seat";
+ }
+}
+
+document.getElementById("niat").addEventListener("keydown",e=>{
+ if(e.key==="Enter") findSeat();
+});
+</script>
+</body>
+</html>
