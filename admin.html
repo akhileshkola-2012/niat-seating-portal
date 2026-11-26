@@ -1,1 +1,610 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NIAT Seating Portal | Admin</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f3f6fb;
+      color: #172033;
+    }
+    header {
+      background: #102b50;
+      color: white;
+      padding: 22px 7%;
+    }
+    header h1 { margin: 0; font-size: 22px; }
+    header p { margin: 7px 0 0; color: #c9d7e8; font-size: 14px; }
+    main {
+      width: min(850px, 92%);
+      margin: 30px auto;
+    }
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 26px;
+      margin-bottom: 20px;
+      box-shadow: 0 5px 22px rgba(20, 40, 70, .07);
+    }
+    h2 { margin: 0 0 8px; font-size: 21px; }
+    .sub { color: #65748b; font-size: 14px; line-height: 1.5; }
+    label {
+      display: block;
+      margin: 18px 0 7px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    input, select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 15px;
+      background: white;
+    }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 12px 18px;
+      background: #155eef;
+      color: white;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    button.secondary { background: #475569; }
+    button.danger { background: #b42318; }
+    .hidden { display: none !important; }
+    .message {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+      display: none;
+      white-space: pre-wrap;
+    }
+    .success { display: block; background: #ecfdf3; color: #067647; }
+    .error { display: block; background: #fef3f2; color: #b42318; }
+    .info { display: block; background: #eff8ff; color: #175cd3; }
+    .topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .topline button { margin-top: 0; }
+    .filebox {
+      border: 2px dashed #b8c5d6;
+      border-radius: 10px;
+      padding: 20px;
+      background: #f8fafc;
+    }
+    .table-wrap { overflow-x: auto; margin-top: 18px; }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 650px;
+      font-size: 13px;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #e5eaf1;
+      text-align: left;
+    }
+    th { background: #f1f5f9; }
+    .hint {
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.6;
+      margin-top: 10px;
+    }
+    .count {
+      display: inline-block;
+      background: #eaf1ff;
+      color: #174ea6;
+      padding: 6px 10px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 12px;
+    }
+    footer {
+      text-align: center;
+      color: #718096;
+      font-size: 12px;
+      padding: 20px;
+    }
+  </style>
+</head>
+
+<body>
+<header>
+  <h1>NIAT Examination Seating Portal</h1>
+  <p>Administrator Dashboard</p>
+</header>
+
+<main>
+  <section class="card" id="loginCard">
+    <h2>Admin Login</h2>
+    <p class="sub">Sign in using your authorized NIAT administrator account.</p>
+
+    <form id="loginForm">
+      <label for="email">Email Address</label>
+      <input id="email" type="email" autocomplete="username"
+             placeholder="Enter admin email" required>
+
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password"
+             placeholder="Enter password" required>
+
+      <button id="loginBtn" type="submit">Login</button>
+    </form>
+    <div id="loginMessage" class="message"></div>
+  </section>
+
+  <section class="card hidden" id="dashboard">
+    <div class="topline">
+      <div>
+        <h2>Upload Seating Data</h2>
+        <p class="sub">Signed in as <strong id="adminEmail"></strong></p>
+      </div>
+      <button class="secondary" id="logoutBtn">Logout</button>
+    </div>
+
+    <label for="examType">Select Examination</label>
+    <select id="examType">
+      <option value="Skill Assessments">Skill Assessments</option>
+      <option value="BITS">BITS</option>
+      <option value="GRIT">GRIT</option>
+    </select>
+
+    <label for="csvFile">Upload CSV File</label>
+    <div class="filebox">
+      <input id="csvFile" type="file" accept=".csv,text/csv">
+      <p class="hint">
+        Upload a CSV file with the seating details. The first row must contain
+        column headings. BITS files must also include a BITS ID column.
+      </p>
+    </div>
+
+    <div id="fileMessage" class="message"></div>
+    <div id="previewArea" class="hidden">
+      <div class="count" id="recordCount"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>NIAT ID</th>
+              <th>BITS ID</th>
+              <th>Name</th>
+              <th>Exam Name</th>
+              <th>Time</th>
+              <th>Hall</th>
+              <th>Seat</th>
+            </tr>
+          </thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+      </div>
+      <button id="uploadBtn">Replace Selected Exam Data</button>
+      <p class="hint">
+        This replaces the existing records for the selected examination only.
+        Other examination records are not intentionally changed.
+      </p>
+    </div>
+
+    <div id="uploadMessage" class="message"></div>
+  </section>
+</main>
+
+<footer>NIAT Examination Seating Portal</footer>
+
+<script>
+  const CONFIG = window.NIAT_CONFIG || {};
+  const SUPABASE_URL = CONFIG.SUPABASE_URL;
+  const SUPABASE_KEY = CONFIG.SUPABASE_KEY;
+
+  const loginCard = document.getElementById("loginCard");
+  const dashboard = document.getElementById("dashboard");
+  const loginMessage = document.getElementById("loginMessage");
+  const fileMessage = document.getElementById("fileMessage");
+  const uploadMessage = document.getElementById("uploadMessage");
+  const uploadBtn = document.getElementById("uploadBtn");
+
+  let supabaseClient;
+  let parsedRecords = [];
+  let currentFileName = "";
+
+  function showMessage(element, message, type) {
+    element.textContent = message;
+    element.className = "message " + type;
+  }
+
+  function clearMessage(element) {
+    element.textContent = "";
+    element.className = "message";
+  }
+
+  function normalizeHeader(value) {
+    return String(value || "")
+      .replace(/^\uFEFF/, "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+  }
+
+  function findColumn(headers, possibleNames) {
+    const normalized = headers.map(normalizeHeader);
+    for (const name of possibleNames) {
+      const index = normalized.indexOf(normalizeHeader(name));
+      if (index !== -1) return index;
+    }
+    return -1;
+  }
+
+  // CSV parser that supports quoted values and commas inside quotes.
+  function parseCSV(text) {
+    const rows = [];
+    let row = [];
+    let value = "";
+    let quoted = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+
+      if (ch === '"') {
+        if (quoted && text[i + 1] === '"') {
+          value += '"';
+          i++;
+        } else {
+          quoted = !quoted;
+        }
+      } else if (ch === "," && !quoted) {
+        row.push(value.trim());
+        value = "";
+      } else if ((ch === "\n" || ch === "\r") && !quoted) {
+        if (ch === "\r" && text[i + 1] === "\n") i++;
+        row.push(value.trim());
+        if (row.some(cell => cell !== "")) rows.push(row);
+        row = [];
+        value = "";
+      } else {
+        value += ch;
+      }
+    }
+
+    row.push(value.trim());
+    if (row.some(cell => cell !== "")) rows.push(row);
+
+    return rows;
+  }
+
+  function getCell(row, index) {
+    return index < 0 ? "" : String(row[index] || "").trim();
+  }
+
+  function parseRecords(text, examType) {
+    const rows = parseCSV(text);
+    if (rows.length < 2) {
+      throw new Error("The CSV file has no student records.");
+    }
+
+    const headers = rows[0];
+
+    const col = {
+      niat: findColumn(headers, ["NIAT ID", "NIAT_ID", "NIATID"]),
+      bits: findColumn(headers, ["BITS ID", "BITS_ID", "BITSID"]),
+      name: findColumn(headers, ["Name", "Student Name", "Student_Name"]),
+      exam: findColumn(headers, ["Exam Name", "Examination Name", "Exam"]),
+      time: findColumn(headers, ["Time", "Exam Time", "Examination Time"]),
+      hall: findColumn(headers, ["Hall No.", "Hall No", "Hall Number", "Examination Hall", "Hall"]),
+      seat: findColumn(headers, ["Seat No.", "Seat No", "Seat Number", "Seat"])
+    };
+
+    const required = [
+      ["NIAT ID", col.niat],
+      ["Name", col.name],
+      ["Exam Name", col.exam],
+      ["Time", col.time],
+      ["Hall No.", col.hall],
+      ["Seat No.", col.seat]
+    ];
+
+    const missing = required.filter(item => item[1] === -1).map(item => item[0]);
+    if (missing.length) {
+      throw new Error("Missing CSV columns: " + missing.join(", "));
+    }
+
+    if (examType === "BITS" && col.bits === -1) {
+      throw new Error("BITS CSV must contain a BITS ID column.");
+    }
+
+    const records = [];
+    const seen = new Set();
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const niatId = getCell(row, col.niat);
+      if (!niatId) continue;
+
+      if (seen.has(niatId.toUpperCase())) {
+        throw new Error("Duplicate NIAT ID found: " + niatId);
+      }
+      seen.add(niatId.toUpperCase());
+
+      const record = {
+        exam_type: examType,
+        niat_id: niatId,
+        bits_id: getCell(row, col.bits) || null,
+        student_name: getCell(row, col.name),
+        exam_name: getCell(row, col.exam),
+        exam_time: getCell(row, col.time),
+        hall_no: getCell(row, col.hall),
+        seat_no: getCell(row, col.seat)
+      };
+
+      if (
+        !record.student_name || !record.exam_name ||
+        !record.exam_time || !record.hall_no || !record.seat_no
+      ) {
+        throw new Error("Missing required data in CSV row " + (i + 1) + ".");
+      }
+
+      records.push(record);
+    }
+
+    if (!records.length) {
+      throw new Error("No valid student records were found.");
+    }
+
+    return records;
+  }
+
+  function renderPreview(records) {
+    const body = document.getElementById("previewBody");
+    body.innerHTML = "";
+
+    records.slice(0, 10).forEach(record => {
+      const tr = document.createElement("tr");
+      [
+        record.niat_id,
+        record.bits_id || "—",
+        record.student_name,
+        record.exam_name,
+        record.exam_time,
+        record.hall_no,
+        record.seat_no
+      ].forEach(value => {
+        const td = document.createElement("td");
+        td.textContent = value;
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+
+    document.getElementById("recordCount").textContent =
+      records.length + " student record(s) ready. Preview shows up to 10.";
+
+    document.getElementById("previewArea").classList.remove("hidden");
+  }
+
+  async function checkAdmin() {
+    const { data: { session }, error: sessionError } =
+      await supabaseClient.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    if (!session) {
+      showLogin();
+      return false;
+    }
+
+    const { data, error } = await supabaseClient.rpc("is_portal_admin");
+
+    if (error) {
+      await supabaseClient.auth.signOut();
+      throw new Error("Could not verify admin access: " + error.message);
+    }
+
+    if (data !== true) {
+      await supabaseClient.auth.signOut();
+      throw new Error("This account is not authorized as a portal admin.");
+    }
+
+    document.getElementById("adminEmail").textContent =
+      session.user.email || "Authorized administrator";
+
+    loginCard.classList.add("hidden");
+    dashboard.classList.remove("hidden");
+    return true;
+  }
+
+  function showLogin() {
+    dashboard.classList.add("hidden");
+    loginCard.classList.remove("hidden");
+  }
+
+  async function initialize() {
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      showMessage(loginMessage,
+        "Supabase configuration is missing. Please check config.js.",
+        "error");
+      return;
+    }
+
+    if (!window.supabase || !window.supabase.createClient) {
+      showMessage(loginMessage,
+        "Supabase library could not load. Refresh the page and try again.",
+        "error");
+      return;
+    }
+
+    supabaseClient = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY
+    );
+
+    try {
+      await checkAdmin();
+    } catch (error) {
+      showMessage(loginMessage, error.message, "error");
+      showLogin();
+    }
+  }
+
+  document.getElementById("loginForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    clearMessage(loginMessage);
+
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const button = document.getElementById("loginBtn");
+
+    button.disabled = true;
+    button.textContent = "Signing in...";
+
+    try {
+      const { error } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) throw error;
+
+      await checkAdmin();
+      showMessage(uploadMessage, "Admin login successful.", "success");
+    } catch (error) {
+      showMessage(loginMessage, error.message, "error");
+    } finally {
+      button.disabled = false;
+      button.textContent = "Login";
+    }
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", async () => {
+    await supabaseClient.auth.signOut();
+    parsedRecords = [];
+    document.getElementById("previewArea").classList.add("hidden");
+    document.getElementById("csvFile").value = "";
+    clearMessage(uploadMessage);
+    showLogin();
+  });
+
+  document.getElementById("csvFile").addEventListener("change", async event => {
+    clearMessage(fileMessage);
+    clearMessage(uploadMessage);
+    document.getElementById("previewArea").classList.add("hidden");
+    parsedRecords = [];
+
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      showMessage(fileMessage, "Please select a CSV file.", "error");
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const examType = document.getElementById("examType").value;
+      parsedRecords = parseRecords(text, examType);
+      currentFileName = file.name;
+      renderPreview(parsedRecords);
+      showMessage(fileMessage,
+        "CSV validated successfully: " + currentFileName,
+        "success");
+    } catch (error) {
+      showMessage(fileMessage, error.message, "error");
+    }
+  });
+
+  document.getElementById("examType").addEventListener("change", () => {
+    parsedRecords = [];
+    document.getElementById("csvFile").value = "";
+    document.getElementById("previewArea").classList.add("hidden");
+    clearMessage(fileMessage);
+    clearMessage(uploadMessage);
+  });
+
+  uploadBtn.addEventListener("click", async () => {
+    if (!parsedRecords.length) {
+      showMessage(uploadMessage, "Please select and validate a CSV file first.", "error");
+      return;
+    }
+
+    const examType = document.getElementById("examType").value;
+    const confirmed = confirm(
+      "You are about to replace ALL existing " + examType +
+      " seating records with " + parsedRecords.length +
+      " records from this CSV.\n\nOther exam types will remain unchanged.\n\nContinue?"
+    );
+
+    if (!confirmed) return;
+
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = "Uploading...";
+    clearMessage(uploadMessage);
+
+    try {
+      const isAdmin = await checkAdmin();
+      if (!isAdmin) throw new Error("Admin session is not active.");
+
+      // Delete only the selected examination's existing records.
+      const { error: deleteError } = await supabaseClient
+        .from("seating_records")
+        .delete()
+        .eq("exam_type", examType);
+
+      if (deleteError) throw deleteError;
+
+      // Insert the newly validated records.
+      const { error: insertError } = await supabaseClient
+        .from("seating_records")
+        .insert(parsedRecords);
+
+      if (insertError) {
+        throw new Error(
+          "The old records were deleted, but the new upload failed: " +
+          insertError.message +
+          ". Please upload the CSV again after checking the error."
+        );
+      }
+
+      showMessage(
+        uploadMessage,
+        "Successfully uploaded " + parsedRecords.length +
+        " records for " + examType + ".",
+        "success"
+      );
+
+      parsedRecords = [];
+      document.getElementById("csvFile").value = "";
+      document.getElementById("previewArea").classList.add("hidden");
+      clearMessage(fileMessage);
+
+    } catch (error) {
+      showMessage(uploadMessage, error.message, "error");
+    } finally {
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = "Replace Selected Exam Data";
+    }
+  });
+
+  initialize();
+</script>
+</body>
+</html>
+
